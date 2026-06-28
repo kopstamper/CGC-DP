@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Cape Gliding Club — Duty Log</title>
+
+<!-- Add to Home Screen support (iOS + Android) -->
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Duty Log" />
+<meta name="theme-color" content="#0F1B2B" />
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0F1B2B;
+    --panel: #16273C;
+    --panel-alt: #1C2E45;
+    --border: #2A3F56;
+    --border-light: #34516E;
+    --text: #EAF1F7;
+    --muted: #7E97AE;
+    --muted-dark: #4F647C;
+    --placeholder: #3F5469;
+    --accent: #E8A33D;
+    --accent-text: #0F1B2B;
+    --warn-bg: #3A1F1F;
+    --warn-border: #6B3232;
+    --warn-text: #E8A3A3;
+    --good: #7FCBA4;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    padding-bottom: 140px;
+  }
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(15,27,43,0.95);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 16px 12px;
+  }
+  .header-inner {
+    max-width: 640px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; }
+  .brand svg { color: var(--accent); transform: rotate(-45deg); }
+  .brand h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 2px 0 0;
+  }
+  .count { text-align: right; }
+  .count-num {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 24px;
+    color: var(--accent);
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .count-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .container { max-width: 640px; margin: 0 auto; padding: 20px 16px 0; }
+  .error-box {
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    color: var(--warn-text);
+    font-size: 14px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .card-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .field { display: block; position: relative; }
+  .field-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .field-label .opt { color: var(--muted-dark); }
+  input[type="text"], select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: inherit;
+  }
+  input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(232,163,61,0.3);
+  }
+  input::placeholder { color: var(--placeholder); }
+  .mono { font-family: "SF Mono", Menlo, monospace; text-transform: uppercase; }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237E97AE' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+  }
+  .time-row { display: flex; gap: 4px; }
+  .time-row input { text-align: center; }
+  .time-btn {
+    flex-shrink: 0;
+    background: var(--panel-alt);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 0 10px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  .time-btn:active { background: var(--accent); color: var(--accent-text); }
+  .btn-primary {
+    width: 100%;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    padding: 13px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .btn-primary:active { transform: scale(0.99); }
+  details { margin-bottom: 4px; }
+  summary {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    margin-bottom: 12px;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  summary::-webkit-details-marker { display: none; }
+  .list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .list-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .clear-btn {
+    font-size: 12px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .flight-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .flight-summary {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+  .flight-summary-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+  .flight-idx { font-size: 11px; color: var(--muted); font-family: monospace; width: 18px; }
+  .flight-title { font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .flight-title .pname { color: var(--muted); font-weight: 400; }
+  .badge {
+    font-size: 9px;
+    text-transform: uppercase;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+  .flight-sub { font-size: 12px; color: var(--muted); font-family: monospace; margin-top: 2px; }
+  .flight-detail { padding: 0 16px 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .qual-warn { font-size: 11px; color: var(--accent); margin: 4px 0 0; }
+  .qual-unknown { font-size: 11px; color: var(--muted); margin: 4px 0 0; }
+  .duration-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-family: monospace;
+    color: var(--muted);
+    margin-bottom: 12px;
+    padding: 0 2px;
+  }
+  .btn-delete {
+    width: 100%;
+    color: var(--warn-text);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px;
+    border: 1px solid var(--warn-border);
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+  }
+  .btn-delete:active { background: var(--warn-bg); }
+  .empty-state { text-align: center; padding: 40px 0; color: var(--muted-dark); font-size: 14px; }
+  .autocomplete-list {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 4px;
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    max-height: 180px;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .autocomplete-item {
+    width: 100%;
+    text-align: left;
+    padding: 9px 12px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .autocomplete-item.active { background: #28415A; }
+  .autocomplete-item .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .autocomplete-item .tags { display: flex; gap: 4px; flex-shrink: 0; }
+  .autocomplete-item .tags span {
+    font-size: 9px;
+    text-transform: uppercase;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 4px;
+    color: var(--muted);
+  }
+  .export-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(15,27,43,0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+  }
+  .export-bar-inner { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+  .btn-export {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 13px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--accent);
+    color: var(--accent-text);
+    border: none;
+    cursor: pointer;
+  }
+  .btn-export:disabled, .btn-copy:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-copy {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--panel-alt);
+    color: var(--text);
+    border: 1px solid var(--border-light);
+    cursor: pointer;
+  }
+  svg { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div>
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17.8 19.2 16 11l3.5-3.5C20.5 6.5 20.5 5 19.5 4s-2.5-1-3.5 0L12.5 7.5 4.3 5.7c-.4-.1-.8 0-1 .4L3 7l5.5 4.5-2 2-3 .5L5 16l1.5 1.5 2.5-1 2-2L13.5 19l1-.3c.4-.2.5-.6.4-1z"/></svg>
+        <h1>Cape Gliding Club</h1>
+      </div>
+      <p class="subtitle">Duty Pilot Log</p>
+    </div>
+    <div class="count">
+      <div class="count-num" id="flightCount">0</div>
+      <div class="count-label" id="flightCountLabel">flights</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="errorBox"></div>
+
+  <div class="card">
+    <div class="card-label">New flight</div>
+
+    <div class="grid-2">
+      <div class="field" id="field-pilot"></div>
+      <div class="field" id="field-pilotP2"></div>
+    </div>
+
+    <div class="grid-1" style="margin-bottom:12px;">
+      <label class="field">
+        <span class="field-label">Visitor name <span class="opt">(optional)</span></span>
+        <input type="text" id="draft-visitor" autocomplete="off" />
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Flight type</span>
+        <select id="draft-flightType">
+          <option value="">Select…</option>
+          <option value="normal">normal</option>
+          <option value="instruct">instruct</option>
+          <option value="intro">intro</option>
+          <option value="other">other</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Launch method</span>
+        <select id="draft-launchMethod">
+          <option value="">Select…</option>
+          <option value="Aerotow">Aerotow</option>
+          <option value="Winch">Winch</option>
+          <option value="SelfLaunch">SelfLaunch</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Glider reg</span>
+        <input type="text" id="draft-gliderReg" class="mono" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Launch a/c reg <span class="opt">(optional)</span></span>
+        <input type="text" id="draft-launchAircraft" class="mono" autocomplete="off" />
+      </label>
+    </div>
+
+    <div class="field" id="field-launchPilot" style="margin-bottom:16px;"></div>
+
+    <div class="grid-3">
+      <div class="field">
+        <span class="field-label">Takeoff</span>
+        <div class="time-row">
+          <input type="text" inputmode="numeric" placeholder="--:--" id="draft-takeoff" />
+          <button class="time-btn" data-stamp="draft-takeoff" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Tug land</span>
+        <div class="time-row">
+          <input type="text" inputmode="numeric" placeholder="--:--" id="draft-tugLand" />
+          <button class="time-btn" data-stamp="draft-tugLand" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Glider land</span>
+        <div class="time-row">
+          <input type="text" inputmode="numeric" placeholder="--:--" id="draft-glideLand" />
+          <button class="time-btn" data-stamp="draft-glideLand" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <details>
+      <summary>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        Billing details (optional)
+      </summary>
+      <div class="grid-2">
+        <label class="field">
+          <span class="field-label">Charge to</span>
+          <input type="text" id="draft-chargeTo" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span class="field-label">Cash received</span>
+          <input type="text" id="draft-cashReceived" autocomplete="off" />
+        </label>
+      </div>
+      <label class="field" style="margin-bottom:12px;">
+        <span class="field-label">Remarks</span>
+        <input type="text" id="draft-remarks" autocomplete="off" />
+      </label>
+    </details>
+
+    <button class="btn-primary" id="addFlightBtn" type="button">Log flight</button>
+  </div>
+
+  <div id="flightListSection"></div>
+</div>
+
+<div class="export-bar">
+  <div class="export-bar-inner">
+    <button class="btn-export" id="exportBtn" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>
+      <span id="exportBtnLabel">Export myGC timesheet (.xlsx)</span>
+    </button>
+    <button class="btn-copy" id="copyBtn" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span id="copyBtnLabel">Copy as text</span>
+    </button>
+  </div>
+</div>
+
+<script>
+// ===== Member roster (from club export) =====
+const MEMBERS = [{"name": "Adrian Janssen", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Adèle Olivier", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Alfred Federlehner", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Alison Navarro", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andre Kruger", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Andrea Greyling", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Andreas Bergmann", "tugP": true, "winchD": true, "instr": false, "student": false}, {"name": "Andreas Hoffmann", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andreas Litzba", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andreas Lutz", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andreas Spielmann", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andrej Kolar", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andrew Standring", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andrew Vaughan", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Andri Hugo", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "André Van Rensburg", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Anja Hattingh", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ari Cotton", "tugP": true, "winchD": false, "instr": true, "student": false}, {"name": "August Zerwick", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Bazett Louis Kleynhans", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Benedikt Bursian", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Benedikt Waegele", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Bernhard Loder-Taucher", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Bernhard Saneke", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Bjorn-Christian Michaelis", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Boet Coetsee", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Boudewijn Van Swyndregt", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Brad Mears", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Bronwen Klaas", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Bruce De Jager", "tugP": false, "winchD": true, "instr": false, "student": false}, {"name": "Chris Hughes", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Chris Way", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Christel Theron", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Christian Dahms", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Christian Hynek", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Colin Sindle", "tugP": false, "winchD": true, "instr": true, "student": false}, {"name": "Dale Lippstreu", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Danie Rautenbach", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "David Bauder", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Derwyn Oxley", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Dieter Hensler", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Dj Rainier", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Durr Pieters", "tugP": false, "winchD": true, "instr": true, "student": false}, {"name": "Dylan Luis", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Erazem Polutnik", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Erwin Ratzinger", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Etienne De Kock", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Everhardus Loubser", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Felix Hoffmann", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Findlay Smith", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Finn Schelter", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Florian Buker", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Florian HöCk", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Florian Kraja", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Forrester De Beer", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Fourie Grobler", "tugP": false, "winchD": false, "instr": true, "student": false}, {"name": "Frans Du Toit", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Gerard Ivey-Frank", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Gerhard Euler", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Graham Anderson", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Graham Hibbin", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Greta Allen", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Guido Probst", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Hadriaan Van Nes", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Hajo Machetanz", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Hannes Freiderritzi", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Hanno Van Der Walt", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Hans Scheerer", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Harald Lixl", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Helen Forbes", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ian De Vries", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Ian Forbes", "tugP": false, "winchD": true, "instr": true, "student": false}, {"name": "Igor Volkov", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Jac Snyman", "tugP": false, "winchD": false, "instr": true, "student": false}, {"name": "Jaco Booyens", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "James Nel Nel", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Jan Jaap Logtenberg", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Jan Retief", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Jan Rothhardt", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Janita Bellamy", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Jason Adriaan", "tugP": true, "winchD": false, "instr": true, "student": false}, {"name": "Jean Martheze", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Jean Van Niekerk", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Jeppe De Boer", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Joachim Leidner", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Joel Potgieter", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Johan Anderson Anderson", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Johan Barkenhuizen", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "John Coutts", "tugP": false, "winchD": false, "instr": true, "student": false}, {"name": "John During", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "John Henderson", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "John Little", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "John Nagel", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "John Spargo", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Jon Pio", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Jose Paul Sirba", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Julian Wozniak", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Juliana Tamsen", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Karin Wiesenthal", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Karo Karow", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Karol Muller", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ken Urquhart", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Kevin Mitchell", "tugP": false, "winchD": false, "instr": true, "student": false}, {"name": "Laurens Goudriaan", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Laurent Monvoisin", "tugP": false, "winchD": true, "instr": false, "student": false}, {"name": "Lawrence Van Der Westhuizen", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Liam Germishuys", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Lilian Frohlich", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Louis Moore", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Luka Salehar", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Lutz Heydecke", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Machetanz Hans Joachim", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Manfred Rothhardt", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Marco Vermeer", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Marek Gajdinski", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Mark Holiday", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Marko Asceric", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Markus Geisen", "tugP": false, "winchD": true, "instr": true, "student": false}, {"name": "Martin Gruenert", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Martin Kellet", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Martin Kroke", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Martin Ocarroll", "tugP": false, "winchD": true, "instr": false, "student": false}, {"name": "Martin Stessl", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Mathias Schunk", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Matt Nelson", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Matthew Brent", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Matthias Wagener", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Mattias Suter", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Michael Dickinson", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Michael Godoj", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Michael Pfennig", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Michael Tiffin", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Michel Reolon", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Mike Kopman", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Mike Pascoe", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Moritz Isler", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Nicholas Oberhofer", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Nico Le Roux", "tugP": false, "winchD": true, "instr": true, "student": false}, {"name": "Nicolas Bennet", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Norman Duarte", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ockert Brits", "tugP": false, "winchD": false, "instr": true, "student": false}, {"name": "Oscar Goudriaan", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Paul Bailey", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Paul Kohler", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Peter Clemence", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "Peter Farrell", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Peter Kotysch", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Peter Leister", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Peter Machlup", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Peter Troy-Davies", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Pieter Wiese", "tugP": true, "winchD": false, "instr": true, "student": false}, {"name": "Reinhard Pankow", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Rene Hanses", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Rene Lans", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Rens Van Broekhuijsen", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Richard Barber Barber", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Rico Suter", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Rob Kakebeeke", "tugP": false, "winchD": true, "instr": false, "student": false}, {"name": "Rob Tiffin", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Robert Anderson", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Robert Ketteringham", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Robert Miesbauer", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Roger Tiburg", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ronald Reith", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ruben Hugo", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Rudi Hiltbrunner", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Rudolf Schlesinger", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Rudolph Scharneck", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ruslan Malkov", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Seth Berrill", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Sigi Fohn", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Slavo Piskaty", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Sophie Schackert", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Stef Juncker", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Stefan Le Jeune", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Stefan Senger", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Steffen Schwarzer", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Stephan Van Den Berg", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Stephan Vermeulen", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Steve Porter", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Sven Olivier Olivier", "tugP": true, "winchD": false, "instr": true, "student": false}, {"name": "Swen Holtmann", "tugP": false, "winchD": true, "instr": false, "student": false}, {"name": "Thomas Pflug", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Tim Groenewald", "tugP": true, "winchD": false, "instr": false, "student": false}, {"name": "Tim Scharf", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Tokkie (Pieter R.) Carstens", "tugP": false, "winchD": true, "instr": false, "student": false}, {"name": "Ulrich Gmelin", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ulrich Messmer", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Ute Baronowski", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Uwe Thiele", "tugP": false, "winchD": false, "instr": false, "student": false}, {"name": "Uys Kruger", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "Wally Tamsen", "tugP": false, "winchD": true, "instr": true, "student": false}, {"name": "Wilhelm Mosehuus", "tugP": true, "winchD": true, "instr": true, "student": false}, {"name": "William Walker", "tugP": false, "winchD": false, "instr": false, "student": true}, {"name": "William Whittaker", "tugP": false, "winchD": false, "instr": true, "student": false}, {"name": "Wynand Wilsenach", "tugP": false, "winchD": false, "instr": false, "student": false}]
+;
+
+// ===== Constants =====
+const STORAGE_KEY = "cgc-duty-log-flights-html-v1";
+const LAUNCH_METHODS = ["Aerotow", "Winch", "SelfLaunch"];
+const FLIGHT_TYPES = ["normal", "instruct", "intro", "other"];
+
+// ===== State =====
+let flights = [];
+let draft = blankFlight();
+
+function blankFlight() {
+  return {
+    id: crypto.randomUUID(),
+    pilot: "", pilotP2: "", visitor: "", flightType: "", launchMethod: "",
+    launchPilot: "", launchAircraft: "", gliderReg: "",
+    takeoff: "", tugLand: "", glideLand: "",
+    chargeTo: "", cashReceived: "", remarks: "",
+  };
+}
+
+// ===== Time helpers =====
+function timeNow() {
+  const d = new Date();
+  return d.toTimeString().slice(0, 5);
+}
+function toMinutes(hhmm) {
+  if (!hhmm || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+function diffMinutes(start, end) {
+  const s = toMinutes(start), e = toMinutes(end);
+  if (s === null || e === null) return null;
+  let d = e - s;
+  if (d < 0) d += 1440;
+  return d;
+}
+function fmtDuration(mins) {
+  if (mins === null) return "—";
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m`;
+}
+function timeToExcelFraction(hhmm) {
+  const mins = toMinutes(hhmm);
+  return mins === null ? null : mins / 1440;
+}
+
+// ===== Persistence (localStorage, per-browser) =====
+function saveState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ flights, draft }));
+  } catch (e) {
+    showError("Couldn't save — your entries are only kept on screen right now.");
+  }
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.flights)) flights = parsed.flights;
+      if (parsed.draft) draft = Object.assign(blankFlight(), parsed.draft);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// ===== Member lookup =====
+function lookupMember(name) {
+  if (!name) return null;
+  const t = name.trim().toLowerCase();
+  return MEMBERS.find((m) => m.name.toLowerCase() === t) || null;
+}
+
+// ===== Error banner =====
+let errorTimeout = null;
+function showError(msg) {
+  const box = document.getElementById("errorBox");
+  box.innerHTML = `<div class="error-box">${escapeHtml(msg)}</div>`;
+  if (errorTimeout) clearTimeout(errorTimeout);
+}
+function clearError() {
+  document.getElementById("errorBox").innerHTML = "";
+}
+function escapeHtml(s) {
+  const div = document.createElement("div");
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+// ===== Custom confirm modal (native confirm() is blocked in some in-app/preview webviews) =====
+function showConfirm(message, onConfirm) {
+  const existing = document.getElementById("customConfirmOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "customConfirmOverlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;";
+  overlay.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:340px;width:100%;">
+      <p style="margin:0 0 16px;font-size:14px;color:var(--text);">${escapeHtml(message)}</p>
+      <div style="display:flex;gap:8px;">
+        <button id="customConfirmCancel" style="flex:1;padding:10px;border-radius:8px;background:var(--panel-alt);border:1px solid var(--border-light);color:var(--text);font-size:14px;">Cancel</button>
+        <button id="customConfirmOk" style="flex:1;padding:10px;border-radius:8px;background:var(--warn-text);border:none;color:#2A1414;font-weight:600;font-size:14px;">Clear</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.getElementById("customConfirmCancel").addEventListener("click", () => overlay.remove());
+  document.getElementById("customConfirmOk").addEventListener("click", () => {
+    overlay.remove();
+    onConfirm();
+  });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) overlay.remove();
+  });
+}
+
+// ===== Autocomplete field component (vanilla) =====
+// Renders a labeled text input with member-name suggestions into a container.
+function renderMemberField(containerId, opts) {
+  // opts: { label, optional, getValue, setValue, getQualReq }
+  const container = document.getElementById(containerId);
+  const fieldId = containerId + "-input";
+  const value = opts.getValue();
+  container.innerHTML = `
+    <label class="field-label">${opts.label}${opts.optional ? ' <span class="opt">(optional)</span>' : ""}</label>
+    <input type="text" id="${fieldId}" autocomplete="off" value="${escapeHtml(value)}" />
+    <div class="autocomplete-list" id="${fieldId}-list" style="display:none;"></div>
+    <div id="${fieldId}-msg"></div>
+  `;
+  const input = document.getElementById(fieldId);
+  const list = document.getElementById(fieldId + "-list");
+  const msg = document.getElementById(fieldId + "-msg");
+  let highlight = 0;
+  let isOpen = false;
+
+  function getMatches(q) {
+    const query = q.trim().toLowerCase();
+    if (!query) return [];
+    return MEMBERS.filter((m) => m.name.toLowerCase().includes(query)).slice(0, 8);
+  }
+
+  function renderList(matches) {
+    if (matches.length === 0) {
+      list.style.display = "none";
+      return;
+    }
+    list.innerHTML = matches
+      .map((m, i) => {
+        const tags = [];
+        if (m.tugP) tags.push("tug");
+        if (m.instr) tags.push("instr");
+        if (m.winchD) tags.push("winch");
+        return `<button type="button" class="autocomplete-item ${i === highlight ? "active" : ""}" data-name="${escapeHtml(m.name)}">
+          <span class="nm">${escapeHtml(m.name)}</span>
+          <span class="tags">${tags.map((t) => `<span>${t}</span>`).join("")}</span>
+        </button>`;
+      })
+      .join("");
+    list.style.display = "block";
+    list.querySelectorAll(".autocomplete-item").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        selectName(btn.dataset.name);
+      });
+    });
+  }
+
+  function renderMsg() {
+    const v = input.value.trim();
+    const matched = lookupMember(v);
+    const qualReq = opts.getQualReq ? opts.getQualReq() : null;
+    msg.innerHTML = "";
+    if (isOpen) return;
+    if (v && qualReq && matched && !matched[qualReq]) {
+      const labels = { tugP: "not marked as tug pilot", instr: "not marked as instructor", winchD: "not marked as winch driver" };
+      msg.innerHTML = `<p class="qual-warn">⚠ ${escapeHtml(matched.name)} is ${labels[qualReq]} on the club roster.</p>`;
+    } else if (v && !matched && !opts.optional) {
+      msg.innerHTML = `<p class="qual-unknown">Not found on member list — will be saved as entered.</p>`;
+    }
+  }
+
+  function selectName(name) {
+    input.value = name;
+    opts.setValue(name);
+    isOpen = false;
+    list.style.display = "none";
+    renderMsg();
+    if (opts.onAfterChange) opts.onAfterChange();
+  }
+
+  input.addEventListener("input", () => {
+    opts.setValue(input.value);
+    isOpen = true;
+    highlight = 0;
+    renderList(getMatches(input.value));
+    saveState();
+  });
+  input.addEventListener("focus", () => {
+    isOpen = true;
+    renderList(getMatches(input.value));
+  });
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      isOpen = false;
+      list.style.display = "none";
+      renderMsg();
+    }, 120);
+  });
+  input.addEventListener("keydown", (e) => {
+    const matches = getMatches(input.value);
+    if (!isOpen || matches.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      highlight = Math.min(highlight + 1, matches.length - 1);
+      renderList(matches);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      highlight = Math.max(highlight - 1, 0);
+      renderList(matches);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      selectName(matches[highlight].name);
+    } else if (e.key === "Escape") {
+      isOpen = false;
+      list.style.display = "none";
+    }
+  });
+
+  renderMsg();
+  return { refreshMsg: renderMsg };
+}
+
+// ===== Draft form wiring =====
+let pilotFieldHandle, pilotP2FieldHandle, launchPilotFieldHandle;
+
+function renderDraftFields() {
+  pilotFieldHandle = renderMemberField("field-pilot", {
+    label: "Pilot P1",
+    getValue: () => draft.pilot,
+    setValue: (v) => { draft.pilot = v; },
+    getQualReq: () => (draft.flightType === "instruct" ? "instr" : null),
+  });
+  pilotP2FieldHandle = renderMemberField("field-pilotP2", {
+    label: "Pilot P2",
+    optional: true,
+    getValue: () => draft.pilotP2,
+    setValue: (v) => { draft.pilotP2 = v; },
+  });
+  launchPilotFieldHandle = renderMemberField("field-launchPilot", {
+    label: "Launch pilot (tug pilot)",
+    optional: true,
+    getValue: () => draft.launchPilot,
+    setValue: (v) => { draft.launchPilot = v; },
+    getQualReq: () => (draft.launchMethod === "Aerotow" ? "tugP" : null),
+  });
+}
+
+function wireDraftStaticFields() {
+  const simpleFields = ["visitor", "gliderReg", "launchAircraft", "takeoff", "tugLand", "glideLand", "chargeTo", "cashReceived", "remarks"];
+  simpleFields.forEach((f) => {
+    const el = document.getElementById("draft-" + f);
+    el.value = draft[f];
+    el.addEventListener("input", () => {
+      let v = el.value;
+      if (f === "gliderReg" || f === "launchAircraft") v = v.toUpperCase();
+      draft[f] = v;
+      el.value = v;
+      saveState();
+    });
+  });
+
+  const flightTypeEl = document.getElementById("draft-flightType");
+  flightTypeEl.value = draft.flightType;
+  flightTypeEl.addEventListener("change", () => {
+    draft.flightType = flightTypeEl.value;
+    saveState();
+    if (pilotFieldHandle) pilotFieldHandle.refreshMsg();
+  });
+
+  const launchMethodEl = document.getElementById("draft-launchMethod");
+  launchMethodEl.value = draft.launchMethod;
+  launchMethodEl.addEventListener("change", () => {
+    draft.launchMethod = launchMethodEl.value;
+    saveState();
+    if (launchPilotFieldHandle) launchPilotFieldHandle.refreshMsg();
+  });
+
+  document.querySelectorAll(".time-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetId = btn.dataset.stamp;
+      const field = targetId.replace("draft-", "");
+      draft[field] = timeNow();
+      document.getElementById(targetId).value = draft[field];
+      saveState();
+    });
+  });
+}
+
+document.getElementById("addFlightBtn").addEventListener("click", () => {
+  if (!draft.gliderReg && !draft.pilot) {
+    showError("Add at least a glider registration or pilot name before logging.");
+    return;
+  }
+  clearError();
+  flights.push(Object.assign({}, draft, { id: crypto.randomUUID(), expanded: false }));
+  draft = blankFlight();
+  saveState();
+  renderAll();
+});
+
+// ===== Flight list rendering =====
+function renderFlightList() {
+  const section = document.getElementById("flightListSection");
+  document.getElementById("flightCount").textContent = flights.length;
+  document.getElementById("flightCountLabel").textContent = flights.length === 1 ? "flight" : "flights";
+
+  if (flights.length === 0) {
+    section.innerHTML = `<div class="empty-state">No flights logged yet. Fill in the form above to start.</div>`;
+    return;
+  }
+
+  let html = `<div class="list-header">
+    <div class="list-title">Today's flights</div>
+    <button class="clear-btn" id="clearAllBtn" type="button">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+      Clear all
+    </button>
+  </div>`;
+
+  flights.forEach((f, i) => {
+    const tugMins = diffMinutes(f.takeoff, f.tugLand);
+    const glideMins = diffMinutes(f.takeoff, f.glideLand);
+    html += `
+    <div class="flight-card">
+      <button class="flight-summary" data-toggle="${f.id}" type="button">
+        <div class="flight-summary-left">
+          <span class="flight-idx">${i + 1}</span>
+          <div style="min-width:0;">
+            <div class="flight-title">
+              <span>${escapeHtml(f.gliderReg || "No reg")}</span>
+              <span class="pname">${f.pilot ? "· " + escapeHtml(f.pilot) : ""}</span>
+              ${f.launchMethod ? `<span class="badge">${escapeHtml(f.launchMethod)}</span>` : ""}
+            </div>
+            <div class="flight-sub">${f.takeoff || "—"} → ${f.glideLand || "—"} · ${fmtDuration(glideMins)}${f.flightType ? " · " + escapeHtml(f.flightType) : ""}</div>
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;color:var(--muted)">
+          ${f.expanded ? '<path d="M18 15l-6-6-6 6"/>' : '<path d="M6 9l6 6 6-6"/>'}
+        </svg>
+      </button>
+      ${f.expanded ? renderFlightDetail(f, tugMins, glideMins) : ""}
+    </div>`;
+  });
+
+  section.innerHTML = html;
+
+  document.getElementById("clearAllBtn").addEventListener("click", () => {
+    if (flights.length === 0) return;
+    showConfirm(`Clear all ${flights.length} logged flights? This can't be undone.`, () => {
+      flights = [];
+      saveState();
+      renderAll();
+    });
+  });
+
+  section.querySelectorAll("[data-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.toggle;
+      const f = flights.find((fl) => fl.id === id);
+      f.expanded = !f.expanded;
+      saveState();
+      renderAll();
+    });
+  });
+
+  // Wire up expanded flight detail fields
+  flights.forEach((f) => {
+    if (!f.expanded) return;
+    wireFlightDetailFields(f);
+  });
+}
+
+function renderFlightDetail(f, tugMins, glideMins) {
+  return `
+  <div class="flight-detail" data-detail="${f.id}">
+    <div class="grid-2">
+      <div class="field" id="detail-pilot-${f.id}"></div>
+      <div class="field" id="detail-pilotP2-${f.id}"></div>
+    </div>
+    <label class="field" style="margin-bottom:12px;">
+      <span class="field-label">Visitor name <span class="opt">(optional)</span></span>
+      <input type="text" id="detail-visitor-${f.id}" value="${escapeHtml(f.visitor)}" autocomplete="off" />
+    </label>
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Flight type</span>
+        <select id="detail-flightType-${f.id}">
+          <option value="">Select…</option>
+          ${FLIGHT_TYPES.map((t) => `<option value="${t}" ${f.flightType === t ? "selected" : ""}>${t}</option>`).join("")}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Launch method</span>
+        <select id="detail-launchMethod-${f.id}">
+          <option value="">Select…</option>
+          ${LAUNCH_METHODS.map((t) => `<option value="${t}" ${f.launchMethod === t ? "selected" : ""}>${t}</option>`).join("")}
+        </select>
+      </label>
+    </div>
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Glider reg</span>
+        <input type="text" class="mono" id="detail-gliderReg-${f.id}" value="${escapeHtml(f.gliderReg)}" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Launch a/c reg <span class="opt">(optional)</span></span>
+        <input type="text" class="mono" id="detail-launchAircraft-${f.id}" value="${escapeHtml(f.launchAircraft)}" autocomplete="off" />
+      </label>
+    </div>
+    <div class="field" id="detail-launchPilot-${f.id}" style="margin-bottom:12px;"></div>
+    <div class="grid-3">
+      <div class="field">
+        <span class="field-label">Takeoff</span>
+        <div class="time-row">
+          <input type="text" inputmode="numeric" placeholder="--:--" id="detail-takeoff-${f.id}" value="${f.takeoff}" />
+          <button class="time-btn" data-detail-stamp="takeoff" data-id="${f.id}" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Tug land</span>
+        <div class="time-row">
+          <input type="text" inputmode="numeric" placeholder="--:--" id="detail-tugLand-${f.id}" value="${f.tugLand}" />
+          <button class="time-btn" data-detail-stamp="tugLand" data-id="${f.id}" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">Glider land</span>
+        <div class="time-row">
+          <input type="text" inputmode="numeric" placeholder="--:--" id="detail-glideLand-${f.id}" value="${f.glideLand}" />
+          <button class="time-btn" data-detail-stamp="glideLand" data-id="${f.id}" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <label class="field">
+        <span class="field-label">Charge to <span class="opt">(optional)</span></span>
+        <input type="text" id="detail-chargeTo-${f.id}" value="${escapeHtml(f.chargeTo)}" autocomplete="off" />
+      </label>
+      <label class="field">
+        <span class="field-label">Cash received <span class="opt">(optional)</span></span>
+        <input type="text" id="detail-cashReceived-${f.id}" value="${escapeHtml(f.cashReceived)}" autocomplete="off" />
+      </label>
+    </div>
+    <label class="field" style="margin-bottom:12px;">
+      <span class="field-label">Remarks <span class="opt">(optional)</span></span>
+      <input type="text" id="detail-remarks-${f.id}" value="${escapeHtml(f.remarks)}" autocomplete="off" />
+    </label>
+    <div class="duration-row">
+      <span>Tug time: ${fmtDuration(tugMins)}</span>
+      <span>Glider time: ${fmtDuration(glideMins)}</span>
+    </div>
+    <button class="btn-delete" data-delete="${f.id}" type="button">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+      Delete flight
+    </button>
+  </div>`;
+}
+
+function wireFlightDetailFields(f) {
+  renderMemberField(`detail-pilot-${f.id}`, {
+    label: "Pilot P1",
+    getValue: () => f.pilot,
+    setValue: (v) => { f.pilot = v; saveState(); },
+    getQualReq: () => (f.flightType === "instruct" ? "instr" : null),
+  });
+  renderMemberField(`detail-pilotP2-${f.id}`, {
+    label: "Pilot P2",
+    optional: true,
+    getValue: () => f.pilotP2,
+    setValue: (v) => { f.pilotP2 = v; saveState(); },
+  });
+  renderMemberField(`detail-launchPilot-${f.id}`, {
+    label: "Launch pilot",
+    optional: true,
+    getValue: () => f.launchPilot,
+    setValue: (v) => { f.launchPilot = v; saveState(); },
+    getQualReq: () => (f.launchMethod === "Aerotow" ? "tugP" : null),
+  });
+
+  const simpleFields = ["visitor", "gliderReg", "launchAircraft", "chargeTo", "cashReceived", "remarks", "takeoff", "tugLand", "glideLand"];
+  simpleFields.forEach((field) => {
+    const el = document.getElementById(`detail-${field}-${f.id}`);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      let v = el.value;
+      if (field === "gliderReg" || field === "launchAircraft") v = v.toUpperCase();
+      f[field] = v;
+      el.value = v;
+      saveState();
+      if (field === "takeoff" || field === "tugLand" || field === "glideLand") {
+        renderFlightList(); // refresh duration display + summary line live
+      }
+    });
+  });
+
+  const flightTypeEl = document.getElementById(`detail-flightType-${f.id}`);
+  flightTypeEl.addEventListener("change", () => {
+    f.flightType = flightTypeEl.value;
+    saveState();
+    renderAll();
+  });
+  const launchMethodEl = document.getElementById(`detail-launchMethod-${f.id}`);
+  launchMethodEl.addEventListener("change", () => {
+    f.launchMethod = launchMethodEl.value;
+    saveState();
+    renderAll();
+  });
+
+  document.querySelectorAll(`[data-detail-stamp][data-id="${f.id}"]`).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.dataset.detailStamp;
+      f[field] = timeNow();
+      saveState();
+      renderAll();
+    });
+  });
+
+  const delBtn = document.querySelector(`[data-delete="${f.id}"]`);
+  if (delBtn) {
+    delBtn.addEventListener("click", () => {
+      flights = flights.filter((fl) => fl.id !== f.id);
+      saveState();
+      renderAll();
+    });
+  }
+}
+
+// ===== Export: copy as text =====
+function buildExportText() {
+  const today = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  let out = `Cape Gliding Club — Duty Log — ${today}\n${"=".repeat(40)}\n`;
+  if (flights.length === 0) return out + "\nNo flights logged.\n";
+  const lines = flights.map((f, i) => {
+    const tugMins = diffMinutes(f.takeoff, f.tugLand);
+    const glideMins = diffMinutes(f.takeoff, f.glideLand);
+    const parts = [
+      `Flight ${i + 1}`,
+      `  Pilot: ${f.pilot || "—"}${f.pilotP2 ? `   P2: ${f.pilotP2}` : ""}${f.visitor ? `   Visitor: ${f.visitor}` : ""}`,
+      `  Type: ${f.flightType || "—"}    Launch: ${f.launchMethod || "—"}`,
+      `  Glider: ${f.gliderReg || "—"}    Launch a/c: ${f.launchAircraft || "—"} (${f.launchPilot || "—"})`,
+      `  Takeoff: ${f.takeoff || "—"}   Tug land: ${f.tugLand || "—"}   Glider land: ${f.glideLand || "—"}`,
+      `  Tug time: ${fmtDuration(tugMins)}    Glider time: ${fmtDuration(glideMins)}`,
+    ];
+    if (f.chargeTo || f.cashReceived) parts.push(`  Charge to: ${f.chargeTo || "—"}   Cash: ${f.cashReceived || "—"}`);
+    if (f.remarks) parts.push(`  Remarks: ${f.remarks}`);
+    return parts.join("\n");
+  });
+  return out + "\n" + lines.join("\n\n") + "\n";
+}
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  const text = buildExportText();
+  const label = document.getElementById("copyBtnLabel");
+  try {
+    await navigator.clipboard.writeText(text);
+    label.textContent = "Copied";
+    setTimeout(() => { label.textContent = "Copy as text"; }, 2000);
+  } catch (e) {
+    showError("Couldn't copy automatically — select and copy the text below manually.");
+  }
+});
+
+// ===== Export: myGC .xlsx =====
+document.getElementById("exportBtn").addEventListener("click", () => {
+  if (typeof XLSX === "undefined") {
+    showError("The Excel export library couldn't load (needs internet access at least once). Use \"Copy as text\" instead, or try again with a signal.");
+    return;
+  }
+  if (flights.length === 0) {
+    showError("Log at least one flight before exporting.");
+    return;
+  }
+  if (flights.length > 44) {
+    showError("The myGC template has 44 flight rows (9–52). Export in batches of 44 or fewer.");
+    return;
+  }
+  clearError();
+  try {
+    exportMyGC();
+  } catch (e) {
+    showError("Export failed: " + e.message + ". Try \"Copy as text\" instead.");
+  }
+});
+
+function exportMyGC() {
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  const merges = [];
+
+  function setCell(addr, value, opts) {
+    if (value && typeof value === "object" && "f" in value) {
+      ws[addr] = Object.assign({ f: value.f }, opts);
+    } else {
+      ws[addr] = Object.assign({ v: value }, opts);
+    }
+  }
+
+  setCell("B1", "myGC OFFLINE TIMESHEET");
+  merges.push({ s: { r: 0, c: 1 }, e: { r: 0, c: 3 } });
+  setCell("G1", "Tug TACHO READINGS");
+  setCell("K1", "TIMEKEEPERS");
+  setCell("M1", "Notes:");
+  setCell("G2", "Start");
+  setCell("H2", "End");
+  setCell("I2", "Diff.");
+  setCell("E3", "Tug1 : ");
+  setCell("J3", "Timekeeper1:");
+  setCell("E4", "Tug2 : ");
+  setCell("J4", "Timekeeper2:");
+  setCell("E5", "Tug3 : ");
+  setCell("J5", "Timekeeper3:");
+  setCell("B5", "Timesheet Date :");
+  setCell("D5", "dd/mm/yyyy");
+
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, "0");
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const yyyy = today.getFullYear();
+  setCell("C5", `${dd}/${mm}/${yyyy}`, { t: "s" });
+
+  const headerRow7 = {
+    B7: "Pilot P1", C7: "Pilot P2", D7: "Visitor", E7: "Flight", F7: "Lauch",
+    G7: "Launch Pilot", H7: "Launch ", I7: "Aircraft", J7: "Take off",
+    K7: "Tug Land", L7: "Glider Land", M7: "Tug", N7: "Time", O7: "Flying",
+    P7: "Chrg To", Q7: "Cash Recvd", R7: "Remarks",
+  };
+  Object.entries(headerRow7).forEach(([addr, v]) => setCell(addr, v));
+
+  const headerRow8 = {
+    B8: "PIC or Instructor", C8: "Pupil or Pax", D8: "Full Name", E8: "Type",
+    F8: "Method", H8: "A/C", J8: "Hrs:Min", K8: "Hrs:Min", L8: "Hrs:Min",
+    M8: "Time", O8: "Time", P8: "Billing",
+  };
+  Object.entries(headerRow8).forEach(([addr, v]) => setCell(addr, v));
+
+  const startRow = 9;
+  flights.forEach((f, idx) => {
+    const r = startRow + idx;
+    setCell(`A${r}`, idx === 0 ? 1 : { f: `A${r - 1}+1` });
+    if (f.pilot) setCell(`B${r}`, f.pilot, { t: "s" });
+    if (f.pilotP2) setCell(`C${r}`, f.pilotP2, { t: "s" });
+    if (f.visitor) setCell(`D${r}`, f.visitor, { t: "s" });
+    if (f.flightType) setCell(`E${r}`, f.flightType, { t: "s" });
+    if (f.launchMethod) setCell(`F${r}`, f.launchMethod, { t: "s" });
+    if (f.launchPilot) setCell(`G${r}`, f.launchPilot, { t: "s" });
+    if (f.launchAircraft) setCell(`H${r}`, f.launchAircraft, { t: "s" });
+    if (f.gliderReg) setCell(`I${r}`, f.gliderReg, { t: "s" });
+
+    const toFrac = timeToExcelFraction(f.takeoff);
+    const tlFrac = timeToExcelFraction(f.tugLand);
+    const glFrac = timeToExcelFraction(f.glideLand);
+    if (toFrac !== null) setCell(`J${r}`, toFrac, { t: "n", z: "h:mm" });
+    if (tlFrac !== null) setCell(`K${r}`, tlFrac, { t: "n", z: "h:mm" });
+    if (glFrac !== null) setCell(`L${r}`, glFrac, { t: "n", z: "h:mm" });
+
+    setCell(`M${r}`, { f: `(K${r}-J${r})` }, { z: "h:mm" });
+    setCell(`O${r}`, { f: `L${r}-J${r}` }, { z: "h:mm" });
+
+    if (f.chargeTo) setCell(`P${r}`, f.chargeTo, { t: "s" });
+    if (f.cashReceived) setCell(`Q${r}`, f.cashReceived, { t: "n" });
+    if (f.remarks) setCell(`R${r}`, f.remarks, { t: "s" });
+  });
+
+  for (let r = startRow + flights.length; r <= 52; r++) {
+    setCell(`A${r}`, { f: `A${r - 1}+1` });
+    setCell(`M${r}`, { f: `(K${r}-J${r})` }, { z: "h:mm" });
+    setCell(`O${r}`, { f: `L${r}-J${r}` }, { z: "h:mm" });
+  }
+
+  setCell("K53", "Total hours");
+  setCell("M53", { f: "SUM(M9:M52)" }, { z: "h:mm" });
+  setCell("N53", { f: "SUM(N9:N51)/60" });
+  setCell("O53", { f: "SUM(O9:O52)" }, { z: "h:mm" });
+  setCell("Q53", { f: "SUM(Q9:Q52)" });
+  setCell("L54", "TOTAL FLYING");
+  setCell("R54", 0);
+  setCell("L55", "Total Flights");
+  setCell("O55", { f: "COUNTA(B9:B52)" });
+  setCell("B56", "Comments");
+
+  const range = { s: { r: 0, c: 0 }, e: { r: 59, c: 17 } };
+  ws["!ref"] = XLSX.utils.encode_range(range);
+  ws["!merges"] = merges;
+  ws["!cols"] = [
+    { wch: 4 }, { wch: 16 }, { wch: 15 }, { wch: 13 }, { wch: 9 },
+    { wch: 10 }, { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 9 },
+    { wch: 9 }, { wch: 11 }, { wch: 8 }, { wch: 6 }, { wch: 7 },
+    { wch: 9 }, { wch: 13 }, { wch: 40 },
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Timesheet");
+
+  const picklistsWs = XLSX.utils.aoa_to_sheet([
+    ["Aerotow", "normal", "p1"],
+    ["Winch", "instruct", "p2"],
+    ["SelfLaunch", "intro", "split"],
+    [null, "other", "pax"],
+    [null, null, "ignore"],
+  ]);
+  XLSX.utils.book_append_sheet(wb, picklistsWs, "picklists");
+
+  const t2 = new Date();
+  const stamp = `${t2.getFullYear()}${String(t2.getMonth() + 1).padStart(2, "0")}${String(t2.getDate()).padStart(2, "0")}_${String(t2.getHours()).padStart(2, "0")}${String(t2.getMinutes()).padStart(2, "0")}${String(t2.getSeconds()).padStart(2, "0")}`;
+  const filename = `cgc_duty_timesheet_${stamp}.xlsx`;
+
+  // Write as an array buffer and trigger the download manually (more reliable
+  // across iOS Safari / in-app browsers than XLSX.writeFile's internal method).
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([wbout], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+  const label = document.getElementById("exportBtnLabel");
+  label.textContent = "Downloaded";
+  setTimeout(() => { label.textContent = "Export myGC timesheet (.xlsx)"; }, 2500);
+}
+
+// ===== Init =====
+function renderAll() {
+  renderDraftFields();
+  renderFlightList();
+}
+
+loadState();
+wireDraftStaticFields();
+renderAll();
+</script>
+</body>
+</html>
